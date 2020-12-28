@@ -1,6 +1,6 @@
 const vNodeType = {
     HTML:"HTML",
-    Text:"TEXT",
+    TEXT:"TEXT",
     COMPONENT:"COMPONENT",
     CLASS_COMPONENT:"CLASS_COMPONENT"
 }
@@ -18,11 +18,11 @@ function createElement(tag,data,children=null){
     let flag;   // 用于标记元素的类型
     if(typeof tag === "string"){
         //元素是一个普通的html标签
-        tag = vNodeType.HTML;
+        flag = vNodeType.HTML;
     }else if(typeof tag === "function"){
-        tag = vNode.COMPONENT
+        flag = vNodeType.COMPONENT
     }else{
-        tag = vNodeType.TEXT
+        flag = vNodeType.TEXT
     }
     let childrenFlag;  // 用于标记子元素的类型，没有子元素，一个子元素和多个子元素
     if(children==null){
@@ -46,7 +46,8 @@ function createElement(tag,data,children=null){
     flag,     // vnode类型
     data,
     children,
-    childrenFlag
+    childrenFlag,
+    el:null
   }
 }
 
@@ -54,7 +55,7 @@ function createElement(tag,data,children=null){
 // 创建文本类型的虚拟DOM
 function createTextVNode(text){
   return {
-      flag:vnodeType.TEXT,
+      flag:vNodeType.TEXT,
       tag:null,
       data:null,
       children:text,
@@ -63,3 +64,44 @@ function createTextVNode(text){
 }
 
 // 如何渲染 render
+
+function render(vNode, container) {
+    // 区分首次渲染和再次渲染,再次渲染需要进行diff。
+    console.log("vNode",JSON.stringify(vNode, null, 2))
+    mount(vNode,container)
+}
+
+// mount
+function mount(vNode,container){
+  let {flag} = vNode;
+  if(flag == vNodeType.HTML){
+      mountElement(vNode,container);
+  }else if(flag = vNodeType.TEXT){
+      mountText(vNode, container);
+  }
+}
+
+//挂载元素
+function mountElement(vNode, container) {
+  let dom = document.createElement(vNode.tag);
+  vNode.el = dom;
+  let {data,children,childrenFlag} = vNode;
+  // 挂载子元素
+  if(childrenFlag !== childrenType.EMPTY){
+      if (childrenFlag === childrenType.SINGLE){
+        mount(children,dom)
+      } else if (childrenFlag === childrenType.MULTIPLE) {
+          for(let i = 0;i < children.length;i++){
+              mount(children[i],dom);
+          }
+      }
+  }
+  container.appendChild(dom);
+}
+
+// 挂载文本
+function mountText(vNode,container){
+  let dom = document.createTextNode(vNode.children);
+  vNode.el =dom;
+  container.appendChild(dom);
+}
