@@ -86,6 +86,13 @@ function mountElement(vNode, container) {
   let dom = document.createElement(vNode.tag);
   vNode.el = dom;
   let {data,children,childrenFlag} = vNode;
+  // 挂载data
+  if(data){
+      for(let key in data){
+          // 节点，名字，老值，新值.
+          patchData(dom,key,null,data[key])
+      }
+  }
   // 挂载子元素
   if(childrenFlag !== childrenType.EMPTY){
       if (childrenFlag === childrenType.SINGLE){
@@ -104,4 +111,26 @@ function mountText(vNode,container){
   let dom = document.createTextNode(vNode.children);
   vNode.el =dom;
   container.appendChild(dom);
+}
+
+
+// 挂载data
+function patchData(el, key, prev, next) {
+  switch(key){
+      case "style":
+          for(let k in next){
+              el.style[k] = next[k];
+          }
+          break;
+      case "class":
+          el.className = next;
+          break;
+      default:
+          if(key[0] === "@"){
+              el.addEventListener(key.slice(1),next);
+          }else{
+              el.setAttribute(key,next);
+          }
+          break;
+  }
 }
