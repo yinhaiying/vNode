@@ -67,13 +67,81 @@ function createTextVNode(text){
 
 function render(vNode, container) {
     // 区分首次渲染和再次渲染,再次渲染需要进行diff。
-    console.log("vNode",JSON.stringify(vNode, null, 2))
-    mount(vNode,container)
+    console.log("vNode",container.vNode);
+    if(container.vNode){
+        // 更新 TODO:这里有点问题
+        patch(container.vNode,vNode,container);
+    }else{
+        // 首次渲染
+        mount(vNode, container)
+    }
+    
+}
+
+// DOM diff 算法
+function patch(prev,next,container){
+  let nextVNodeType = next.flag;
+  let prevVNodeType = prev.flag;
+  if(nextVNodeType !== prevVNodeType){
+      // 如果节点类型不同，则直接替换  HTML,TEXT或者组件类型
+      replaceVNode(prev,next,container);
+  } else if (nextVNodeType === "HTML") {
+      // HTML类型的对比
+      patchElement(prev,next,container);
+  } else if (nextVNodeType === "TEXT"){
+      // TEXT类型的对比
+      patchText(prev, next, container);
+  }
+}
+
+// 直接替换原来的节点
+function replaceVNode(prev, next, container) {
+  container.removeChild(prev.el);
+  mount(next,container);
+}
+
+function patchText(prev,next,container){
+    let el = next.el;
+    if(next.children !== prev.children){
+        el.nodeValue = next.children;
+    }
+}
+
+function patchElement(prev,next,container){
+    if(next.tag !== prev.tag){
+        // 元素标签不同，直接替换
+        replaceVNode(prev, next, container);
+        return;
+    }
+    // 如果元素相同
+    let el = (next.el=prev.el);
+    let prevData = prev.data;
+    let nextData = next.data;
+    if(nextData){
+        // 更新
+        for(let key in nextData){
+            let prevVal = prevData[key];
+            let nextVal = nextData[key]
+            patchData(el, key, prevVal, nextVal)
+        }
+    }
+    // 删除老的里面一些新的没有的属性
+    if(prevData){
+        for (let key in prevData) {
+            let prevVal = prevData[key];
+            if(prevVal && !nextData.hasOwnProperty(key)){
+              patchData(el, key, prevVal, null)
+            }
+        }
+    }
+
+
 }
 
 // mount
 function mount(vNode,container){
   let {flag} = vNode;
+//   container.vNode = vNode;
   if(flag == vNodeType.HTML){
       mountElement(vNode,container);
   }else if(flag = vNodeType.TEXT){
@@ -121,13 +189,25 @@ function patchData(el, key, prev, next) {
           for(let k in next){
               el.style[k] = next[k];
           }
+          for(let k in prev){
+             if(!next.hasOwnProperty(k)){
+                 el.style[k] = "";
+             }
+          }
           break;
       case "class":
           el.className = next;
           break;
       default:
           if(key[0] === "@"){
-              el.addEventListener(key.slice(1),next);
+              console.log("prev:",prev);
+              console.log("next:",next);
+              if(prev){
+                  el.removeEventListener(key.slice(1),prev)
+              }
+              if(next){
+                el.addEventListener(key.slice(1), next);
+              }
           }else{
               el.setAttribute(key,next);
           }
