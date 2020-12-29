@@ -14,6 +14,7 @@ DOM操作慢是对比于JS原生API,如原生的一些数组操作。
 ```javascript
 
 const vNode = {
+    type:"div",   // 标签名或者组件名
     key:null,
     props:{
         children:[  // 子元素
@@ -24,7 +25,6 @@ const vNode = {
         onClick:() => {}
     },
     ref:null,
-    type:"div",   // 标签名或者组件名
     ...
 }
 ```
