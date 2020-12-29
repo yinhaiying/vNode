@@ -290,7 +290,7 @@ function createTextVNode(text) {
 }
 ```
 
-### 3.2 将虚拟DOM渲染到真实的DOM上去
+### 3.2 将虚拟DOM挂载到真实的DOM上去
 
 我们得到了虚拟DOM，但是这是一个js对象啊，我们还需要通过它生成真实的DOM，然后挂载到DOM上去。我们在vue或者react中常常见到如下代码：
 
@@ -374,15 +374,76 @@ function mountElement(vNode, container) {
 
 然后查看一下最终的结果，
 
-
+![](C:\Users\yinhaiying\Desktop\虚拟DOM\achievement\images\3-mount.jpg)
 
 我们可以发现成功地实现了元素挂载搭配id为app的元素下面，并且展示到了页面中。
 
+### 3.3 将虚拟DOM的data中属性渲染到DOM上
+
+在上一节中，我们已经能够实现将虚拟DOM挂载到指定的DOM上去，但是对于虚拟DOM上的属性我们还没有进行处理，我们可以发现DOM上实际上应该还有一些id属性，style样式或者class类名等。这些也需要进行处理。
+
+我们首先需要再`mountElement`中遍历data中的属性，然后针对每种属性进行不同的处理。
+
+```javascript
+function mountElement(vNode, container) {
+    ...
+    
+    // 处理data中的属性
+    if (data) {
+        for (let key in data) {
+            // 节点，名字，老值，新值.
+            patchData(dom, key, null, data[key])
+        }
+    }
+    //  ... 挂载children
+    if (childType === childTypes.SINGLE) {
+        mount(vNode.children, dom)
+    } else if (childType === childTypes.MULTIPLE) {
+        for (let i = 0; i < children.length; i++) {
+            let child = children[i];
+            mount(child, dom);
+        }
+    }
+    container.appendChild(dom);
+}
+```
+
+接下来就是针对不同的属性，比如style它是一个对象，class是一个字符串，事件是@开头等，不同属性有不同的处理方式，也就是说我们关键是去实现`patchData`方法。这里只是简单考虑，我们只处理了style和class属性，其他属性的处理方式相似。
+
+```javascript
+function patchData(el,key,oldValue,newValue){
+  switch(key){
+      // 处理style
+      case "style":
+          if(newValue){
+              for(let key in newValue){
+                  el.style[key] = newValue[key];
+              }
+          }
+          if(oldValue){
+            if (newValue && !newValue.hasOwnProperty(k)) {
+                el.style[k] = "";
+            }
+          }
+          break;
+      // 处理class
+      case "class":
+          el.className = newValue;
+          break;
+      case "default":
+          el.setAttribute(key, newValue);
+          break;
+  }
+}
+```
+
+接下来我们查看一下，vNode中属性和元素是否都挂载成功了。
+
+![](C:\Users\yinhaiying\Desktop\虚拟DOM\achievement\images\4-patchData.jpg)
 
 
 
-
-
+我们在DOM中可以看到style和class都成功添加上了，而且属性在页面中也成功生效了。**也就是说到目前为止，我们已经实现了创建虚拟DOM和挂载虚拟DOM这两个关键步骤了。**通过以上的步骤我们基本上对于虚拟DOM已经有了全面，深入的了解了。接下来就是考虑当再次渲染时，如何对虚拟DOM进行DOM-Diff从而进一步优化性能。
 
 
 

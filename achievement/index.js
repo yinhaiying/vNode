@@ -71,9 +71,23 @@ function mount(vNode, container) {
 
 function mountElement(vNode, container) {
     console.log("这里执行了吗")
-    const { tag, childType,  children} = vNode;
+    const {
+        tag,
+        childType,
+        children,
+        data
+    } = vNode;
     const dom = document.createElement(tag);
     vNode.el = dom;
+    
+    // 处理data
+    if (data) {
+        for (let key in data) {
+            // 节点，名字，老值，新值.
+            patchData(dom, key, null, data[key])
+        }
+    }
+
     if (childType === childTypes.SINGLE) {
         mount(vNode.children, dom)
     } else if (childType === childTypes.MULTIPLE) {
@@ -89,4 +103,27 @@ function mountText(vNode, container) {
     let dom = document.createTextNode(vNode.children);
     vNode.el = dom;
     container.appendChild(dom);
+}
+
+function patchData(el,key,oldValue,newValue){
+  switch(key){
+      case "style":
+          if(newValue){
+              for(let key in newValue){
+                  el.style[key] = newValue[key];
+              }
+          }
+          if(oldValue){
+            if (newValue && !newValue.hasOwnProperty(k)) {
+                el.style[k] = "";
+            }
+          }
+          break;
+      case "class":
+          el.className = newValue;
+          break;
+      case "default":
+          el.setAttribute(key, newValue);
+          break;
+  }
 }
