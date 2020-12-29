@@ -115,6 +115,8 @@ const vNode = {
 
 ## 三、创建虚拟DOM
 
+### 3.1 实现createElement函数创建虚拟DOM
+
 通过上面的分析，我们已经知道了什么是虚拟DOM，为什么使用虚拟DOM以及虚拟DOM的组成。接下来我们就需要实现一个虚拟DOM。也就是说我们需要知道如何去生成虚拟DOM。事实上，创建虚拟DOM实际就是去创建一个如下的js对象。
 
 ```javascript
@@ -184,25 +186,197 @@ function createElement(tag,data,children){
 这里我们将tag分为四种类型：**HTML、TEXT、COMPONENT和CLASS_COMPONENT**
 
 ```javascript
-const vNodeType = {
+const vNodeTypes = {
     HTML: "HTML",
     TEXT: "TEXT",
     COMPONENT: "COMPONENT",
     CLASS_COMPONENT: "CLASS_COMPONENT"
 }
+let vNodeType;
+if (typeof tag === "string") {
+    //元素是一个普通的html标签
+    vNodeType = vNodeTypes.HTML;
+} else if (typeof tag === "function") {
+    vNodeType = vNodeTypes.COMPONENT
+} else {
+    vNodeType = vNodeTypes.TEXT
+}
 ```
 
 同理我们将children分为三种类型：没有子元素则children为空，子元素为字符串，说明是子元素是一个文本，以及多个子元素的情况。
 
+```javascript
+const childTypes = {
+    EMPTY: "EMPTY",
+    SINGLE: "SINGLE",
+    MULTIPLE: "MULTIPLE"
+}
+let childType;
+if(children === null){
+    childType = childTypes.EMPTY;
+}else if(Array.isArray(children)){
+    if(children.length === 0){
+        childType = childTypes.EMPTY;
+    }else if(children.length >=1 ){
+        childType = childTypes.MULTIPLY;
+    }
+}else{
+    childType = childTypes.SINGLE;
+    children = createTextVNode(children + "")  // 这里我们对文本类型的children进行了处理
+}
+```
+
+这样的话，我么那就得到了一个比较完整的createElement函数去实现创建虚拟DOM。代码如下：
+
+```javascript
+// 创建虚拟DOM函数
+const vNodeTypes = {
+    HTML: "HTML",
+    TEXT: "TEXT",
+    COMPONENT: "COMPONENT",
+    CLASS_COMPONENT: "CLASS_COMPONENT"
+}
+const childTypes = {
+    EMPTY: "EMPTY",
+    SINGLE: "SINGLE",
+    MULTIPLE: "MULTIPLE"
+}
+
+function createElement(tag, data, children) {
+    // 处理不同的节点类型tag 
+    let vNodeType;
+    if (typeof tag === "string") {
+        //元素是一个普通的html标签
+        vNodeType = vNodeTypes.HTML;
+    } else if (typeof tag === "function") {
+        vNodeType = vNodeTypes.COMPONENT
+    } else {
+        vNodeType = vNodeTypes.TEXT
+    }
+    
+    // 处理不同的children类型
+    let childType;
+    if (children === null) {
+        childType = childTypes.EMPTY;
+    } else if (Array.isArray(children)) {
+        if (children.length === 0) {
+            childType = childTypes.EMPTY;
+        } else if (children.length >= 1) {
+            childType = childTypes.MULTIPLE;
+            console.log("childType:", childType)
+        }
+    } else {
+        childType = childTypes.SINGLE;
+        children = createTextVNode(children + "")
+    }
+
+    return {
+        tag,
+        vNodeType,
+        data,
+        children,
+        childType
+    }
+}
+// 文本的children，直接处理下
+function createTextVNode(text) {
+    return {
+        vNodeType: vNodeTypes.TEXT,
+        tag: null,
+        data: null,
+        children: text,
+        childType: childTypes.EMPTY
+    }
+}
+```
+
+### 3.2 将虚拟DOM渲染到真实的DOM上去
+
+我们得到了虚拟DOM，但是这是一个js对象啊，我们还需要通过它生成真实的DOM，然后挂载到DOM上去。我们在vue或者react中常常见到如下代码：
+
+```
+<div id = "root"></div>
+new Vue({
+  el: "#root",
+  render: (h) => h(app),
+});
+```
+
+其实，上面代码就是将虚拟DOM挂载到id为root的节点上去。我们接下来就需要实现一个`render`函数，将vNode能够渲染到指定的节点上去。对于挂载的处理，我们需要考虑vNodeType和childType。如果vNodeType是TEXT文本类型，那么它children为空，不需要再考虑他的children。而如果是HTML类型，那么还需要考虑它的childType。不同的childType进行不同的处理。
+
+![render](C:\Users\yinhaiying\Desktop\虚拟DOM\achievement\images\render.jpg)
+
+对于挂载节点，我们最常用的方法就是`document.createElement()`和`document.createTextNode`。后者用于创建文本节点。然后通过`appendChild`方法挂载到指定的节点下。
+
+```javascript
+function render(vNode, container) {
+    // render实现的功能就是挂载
+    mount(vNode, container);
+}
+// 挂载
+function mount(vNode, container) {
+    const {  vNodeType } = vNode;
+    // 不同的节点，有不同的挂载方式。文本节点单独处理
+    if (vNodeType == vNodeTypes.HTML) {
+        mountElement(vNode, container);
+    } else if (vNodeType === vNodeTypes.TEXT) {
+        mountText(vNode, container);
+    }
+}
+```
+
+接下来我们需要分别实现挂载文本的`mountText`方法和挂载HTML标签的`mountElement`。
+
+**mountText**
+
+```javascript
+function mountText(vNode, container) {
+    let dom = document.createTextNode(vNode.children);
+    vNode.el = dom;
+    container.appendChild(dom);
+}
+```
+
+**mountElement**
+
+```javascript
+function mountElement(vNode, container) {
+    const { tag, childType,  children} = vNode;
+    const dom = document.createElement(tag);
+    vNode.el = dom;
+    if (childType === childTypes.SINGLE) {
+        mount(vNode.children, dom)
+    } else if (childType === childTypes.MULTIPLE) {
+        for (let i = 0; i < children.length; i++) {
+            let child = children[i];
+            mount(child, dom);
+        }
+    }
+    container.appendChild(dom);
+}
+```
+
+接下来我们使用这个render函数，然后定义一个节点进行挂载：
+
+```javascript
+    <div id="app"></div>
+    <script src = "./index.js"></script>
+    <script>
+        var vNode = createElement("div",{id:"test"},[
+            createElement("p",{key:"a",style:{color:"red",background:"green"}},"节点1"),
+            createElement("p",{key:"d"},"节点4"),
+            createElement("p",{key:"b",class:"item"},"节点2"),
+        ]);
+        // console.log(JSON.stringify(vNode,null,2))
+        render(vNode,document.getElementById("app"));   // 挂载到app上
+    </script>
+```
+
+然后查看一下最终的结果，
 
 
 
-
-
-
-
-
-
+我们可以发现成功地实现了元素挂载搭配id为app的元素下面，并且展示到了页面中。
 
 
 

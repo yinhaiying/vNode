@@ -30,7 +30,6 @@ function createElement(tag, data, children) {
             childType = childTypes.EMPTY;
         } else if (children.length >= 1) {
             childType = childTypes.MULTIPLE;
-            console.log("childType:", childType)
         }
     } else {
         childType = childTypes.SINGLE;
@@ -54,4 +53,40 @@ function createTextVNode(text) {
         children: text,
         childType: childTypes.EMPTY
     }
+}
+
+
+function render(vNode, container) {
+    mount(vNode, container);
+}
+function mount(vNode, container) {
+    const {  vNodeType } = vNode;
+    // 不同的节点，有不同的挂载方式。文本节点单独处理
+    if (vNodeType == vNodeTypes.HTML) {
+        mountElement(vNode, container);
+    } else if (vNodeType === vNodeTypes.TEXT) {
+        mountText(vNode, container);
+    }
+}
+
+function mountElement(vNode, container) {
+    console.log("这里执行了吗")
+    const { tag, childType,  children} = vNode;
+    const dom = document.createElement(tag);
+    vNode.el = dom;
+    if (childType === childTypes.SINGLE) {
+        mount(vNode.children, dom)
+    } else if (childType === childTypes.MULTIPLE) {
+        for (let i = 0; i < children.length; i++) {
+            let child = children[i];
+            mount(child, dom);
+        }
+    }
+    container.appendChild(dom);
+}
+
+function mountText(vNode, container) {
+    let dom = document.createTextNode(vNode.children);
+    vNode.el = dom;
+    container.appendChild(dom);
 }
