@@ -67,10 +67,7 @@ function createTextVNode(text) {
 
 function render(vNode, container) {
     // 区分首次渲染和再次渲染,再次渲染需要进行diff。
-    console.log("vNode", container.vNode);
     if (container.vNode) {
-        // 更新 TODO:这里有点问题
-        console.log("再次渲染执行这里")
         patch(container.vNode, vNode, container);
     } else {
         // 首次渲染
@@ -81,8 +78,6 @@ function render(vNode, container) {
 
 // DOM diff 算法
 function patch(prev, next, container) {
-    console.log("prev:", prev);
-    console.log("next:", next);
     let nextVNodeType = next.flag;
     let prevVNodeType = prev.flag;
     if (nextVNodeType !== prevVNodeType) {
@@ -122,7 +117,6 @@ function patchElement(prev, next, container) {
     let nextData = next.data;
     if (nextData) {
         // 更新
-        console.log("更新:")
         for (let key in nextData) {
             let prevVal = prevData[key];
             let nextVal = nextData[key]
@@ -223,24 +217,26 @@ function patchChildren(
                         let isFind = false;
                         let nextVNode = nextChildren[i];
                         let j = 0;
-                        console.log("nextChildren:", nextChildren[i])
+                        console.log("lastIndex:",lastIndex)
+                        console.log("nextNode:", nextChildren[i])
                         for (j; j < prevChildren.length; j++) {
                             let preVNode = prevChildren[j];
+                            
                             if (preVNode.data.key === nextVNode.data.key) {
                                 isFind = true;
                                 // key相同，表示是同一个元素
                                 patch(preVNode, nextVNode, container);
-                                if (j < lastIndex) {
-                                    // 需要移动元素 insertBefore移动元素
-                                    // abc a 移动到b之后。那么需要找到新的位置的前一个,insertBefore(b的下一个元素)
-                                    // 找到新的位置的前一个，然后进行插入
-                                    let flagNode = nextChildren[i - 1].el.nextSibling;
-                                    container.insertBefore(preVNode.el, flagNode);
-                                } else {
-                                    lastIndex = j;
-                                }
+                                // 只要新数组中，元素相对于前一个兄弟元素的位置，仍然是递增的，那么就不需要处理。
+                                // if (j < lastIndex) {
+                                //     // 需要移动元素 insertBefore移动元素
+                                //     // abc a 移动到b之后。那么需要c的位置，然后使用父元素.insertBefore(a,c)
+                                //     // 只能通过insertBefore进行移动。
+                                //     let flagNode = nextChildren[i - 1].el.nextSibling;
+                                //     container.insertBefore(preVNode.el, flagNode);
+                                // } else {
+                                //     lastIndex = j;
+                                // }
                             }
-                            console.log("preVNode.key:", preVNode.key, "nextVNode.key", nextVNode.key, "isFind:", isFind)
                         }
                         if (!isFind) {
                             console.log("是新增的元素")
@@ -339,8 +335,6 @@ function patchData(el, key, prev, next) {
             break;
         default:
             if (key[0] === "@") {
-                console.log("prev:", prev);
-                console.log("next:", next);
                 if (prev) {
                     el.removeEventListener(key.slice(1), prev)
                 }
