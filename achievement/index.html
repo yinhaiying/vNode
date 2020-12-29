@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虚拟DOM</title>
+</head>
+<body>
+    <div id="test">
+        <p class = "item">p1</p>
+    </div>
+    <script src = "./index.js"></script>
+    <script>
+        var vNode = createElement("div",{id:"test"},[
+           createElement("p",{class:"item"},"p1")
+        ])
+        console.log(JSON.stringify(vNode,null,2))
+    </script>
+    
+</body>
+</html>

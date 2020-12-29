@@ -115,6 +115,89 @@ const vNode = {
 
 ## 三、创建虚拟DOM
 
+通过上面的分析，我们已经知道了什么是虚拟DOM，为什么使用虚拟DOM以及虚拟DOM的组成。接下来我们就需要实现一个虚拟DOM。也就是说我们需要知道如何去生成虚拟DOM。事实上，创建虚拟DOM实际就是去创建一个如下的js对象。
+
+```javascript
+ {
+    tag:"div",
+    data:{
+        id:"test",
+        class:"item"
+    },
+    children:[
+        {tag:"span",data:{},children:"span1"}
+    ]
+}
+```
+
+想要创建虚拟DOM，那么需要借助函数来实现，我们需要一个函数`createElement`能够返回上面的数据，如下如所示：
+
+```javascript
+function createElement(tag,data,children){
+    return {
+        tag,
+        data,
+        children
+    }
+}
+```
+
+这是一个最简单的生成vNode的函数，我们使用这个函数来生成下面真实DOM的vNode。
+
+```html
+    <div id="test">
+        <p class = "item"></p>
+    </div>
+```
+
+通过createElement生成对应的vNode
+
+```javascript
+    var vNode = createElement("div",{id:"test"},[
+        createElement("p",{class:"item"},"p1")
+    ])
+    console.log(JSON.stringify(str,null,2))
+```
+
+查看得到的结果是：
+
+```javascript
+{
+  "tag": "div",
+  "data": {
+    "id": "test"
+  },
+  "children": [
+    {
+      "tag": "p",
+      "data": {
+        "class": "item"
+      },
+      "children": "p1"
+    }
+  ]
+}
+```
+
+通过上面的最简单的createElement将必传的三个参数传进去，然后返回一个js对象就得到了我们对应的vNode。但是上面的createElement太过于简单了，对于传进来的参数我们没有经过任何处理而是直接返回了。但是事实上我们可以发现，每次其实tag和children是应该有所区别的。其中tag它既可能是普通的html标签，可能是文本也可能是组件，而且我们上面发现children可能是一个数组，也可能是一个字符串。对于这些不同之处我们需要进行一下标记。这样的话方便我们之后进行处理。
+
+这里我们将tag分为四种类型：**HTML、TEXT、COMPONENT和CLASS_COMPONENT**
+
+```javascript
+const vNodeType = {
+    HTML: "HTML",
+    TEXT: "TEXT",
+    COMPONENT: "COMPONENT",
+    CLASS_COMPONENT: "CLASS_COMPONENT"
+}
+```
+
+同理我们将children分为三种类型：没有子元素则children为空，子元素为字符串，说明是子元素是一个文本，以及多个子元素的情况。
+
+
+
+
+
 
 
 
