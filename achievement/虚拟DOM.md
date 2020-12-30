@@ -1,4 +1,4 @@
-## 对虚拟DOM和DOM-Diff的简单理解
+## 由浅及深实现虚拟DOM和DOM-Diff
 
 ## 一、前言
 随着前端框架比如Vue和React的不断发展，虚拟DOM和DOM-Diff也随着这些框架被越来越多的人重视。在学习和面试的过程中，越来越成为我们无法回避的知识点。面试时经常会被问到：了解虚拟DOM吗？知道Vue和React的虚拟DOM是什么样的吗？知道他们的DOM-Diff是如何实现的吗？如果你没有认真去看过他们的源码，可能会一问三不知。但是去看源码对一些新手又会觉得有点困难，而且难以理解。**因此，我的一贯的思想是，如果你想要熟练掌握一个东西，最好的方式就是去实现一个简单的这种东西。**<br>
@@ -113,7 +113,7 @@ const vNode = {
 
 知道了虚拟DOM的具体组成，那么接下来我们就需要知道如何去创建虚拟DOM了。
 
-## 三、创建虚拟DOM
+## 三、虚拟DOM的创建和渲染
 
 ### 3.1 实现createElement函数创建虚拟DOM
 
@@ -411,28 +411,28 @@ function mountElement(vNode, container) {
 接下来就是针对不同的属性，比如style它是一个对象，class是一个字符串，事件是@开头等，不同属性有不同的处理方式，也就是说我们关键是去实现`patchData`方法。这里只是简单考虑，我们只处理了style和class属性，其他属性的处理方式相似。
 
 ```javascript
-function patchData(el,key,oldValue,newValue){
-  switch(key){
-      // 处理style
-      case "style":
-          if(newValue){
-              for(let key in newValue){
-                  el.style[key] = newValue[key];
-              }
+function patchData(el, key, oldValue, newValue) {
+  switch (key) {
+    case "style":
+      if (newValue) {
+        for (let k in newValue) {
+          el.style[k] = newValue[k];
+        }
+      }
+      if (oldValue) {
+        for (let k in oldValue) {
+          if (newValue && !newValue.hasOwnProperty(k)) {
+            el.style[k] = "";
           }
-          if(oldValue){
-            if (newValue && !newValue.hasOwnProperty(k)) {
-                el.style[k] = "";
-            }
-          }
-          break;
-      // 处理class
-      case "class":
-          el.className = newValue;
-          break;
-      case "default":
-          el.setAttribute(key, newValue);
-          break;
+        }
+      }
+      break;
+    case "class":
+      el.className = newValue;
+      break;
+    case "default":
+      el.setAttribute(key, newValue);
+      break;
   }
 }
 ```
@@ -447,19 +447,284 @@ function patchData(el,key,oldValue,newValue){
 
 
 
+## 四、DOM-Diff
+
+### 4.1 什么是DOM-Diff？
+
+DOM-Diff从字面上可以理解就是比较两个DOM数的差异。我们在之前的章节中讲述过**虚拟DOM减少DOM操作的两种情况**
+
+1. **虚拟DOM合并多次操作**
+2. **虚拟DOM可以减少操作范围**
+
+这两种情况的实现都需要对DOM树进行比较，记录比较的差异，然后应用到所构建的真正的DOM树上，也就是需要通过**DOM-Diff**来实现。既然两个树之间需要进行比较，那么肯定需要有比较的规则，**其中最核心的规则就是同层比较**。
+
+![](C:\Users\yinhaiying\Desktop\虚拟DOM\achievement\images\6-dom-diff的规则.png)
+
+如上图所示，两个DOM树在DOM Diff算法中只会对同一层级的元素进行比较。既然是同级元素进行比较，那么需要比较哪些内容了。**我们知道虚拟DOM核心主要包括节点类型tag，节点属性data以及子元素children。而比较的实际上就是这三部分，节点是否发生变化了，属性是否发生变化了，子节点是否发生了变化，包括文本类型的子节点内容发生变化，子节点数量发生了变化(增加和删除)，子节点位置发生了变化**。根据这些分析，其大致有有以下几种情况：
+
+1. **节点类型变了**。比如vNodeType从HTML类型变成了TEXT类型。直接写在旧节点然后装载新节点。
+2. **节点类型一样，仅仅是属性或者属性值变了**。不会触发节点的卸载和装载，而是触发节点属性的更新。
+3. **文本变了**。由于文本的变化不涉及到节点的卸载和装载，直接替换文本即可。
+4. **增加/删除/移动了子节点**。这种情况就存在优化的地方了，如果暴力实现就是卸载所有旧的节点，然后直接装载所有新的节点，但是这样的话就没有涉及到DOM Diff了，这种效率非常低下。思考一下，如果我们每次给虚拟DOM的元素一个特定的key值，它能够更具key值，直接找到具体的位置，如果存在说明不是新增或者删除节点，如果位置发生了移动，那么只需要考虑移动到新的位置即可。这样的话无疑效率要高效很多。
 
 
 
+### 4.2 DOM-Diff的实现
 
+#### 4.2.1 区分首次渲染和非首次渲染
 
+我们要实现DOM-DIff，那么首先需要知道什么情况下会使用DOM-Diff。事实上既然需要比较，那么肯定是元素已经被渲染过至少一次了，也就是说我们需要区分一下首次渲染和再次渲染，只有再次渲染的时候才触发DOM-Diff。因此，我们需要修改一下render函数。
 
+```javascript
+function render(vNode, container) {
+    if(container.vNode){
+        // 说明不是首次渲染
+        patch(container.vNode,vNode,container);
+    }else{
+        mount(vNode, container);
+    }
+    // 每次渲染完成之后都把vNode挂载到container身上
+    container.vNode = vNode;
+}
+```
 
+我们通过将vNode挂载到container身上，当下次渲染时，如果这个vNode存在，说明不是首次渲染，那么就需要进行DOM-Diff，也就是要执行`patch`，因此我们接下来的重点就是实现`patch`方法。
 
+#### 4.2.2 实现patch方法
 
+![](C:\Users\yinhaiying\Desktop\虚拟DOM\achievement\images\5-DOM-Diff的整个流程.jpg)
 
+在上面我们提到过DOM-Diff的内容的集中情况，主要是节点类型，属性和子元素。接下来我们就按照这种思路一步一步地进行处理。注意：出于简单处理考虑，我们这里不会处理组件类型的节点。
 
+**一、节点类型变了。比如vNodeType从HTML类型变成了TEXT类型。不需要比较，直接卸载旧节点然后挂载新节点。**
 
+```javascript
+function patch(oldVNode,newVNode,container){
+   const oldVNodeType = oldVNode.vNodeType;
+   const newVNodeType = newVNode.vNodeType;
+   if(oldVNodeType !== newVNodeType){
+       replaceVNode(oldVNode, newVNode,container);
+   }
+}
+// 删除旧节点，然后挂载新节点
+function replaceVNode(oldVNode, newVNode, container) {
+  container.removeChild(oldVNode.el);
+  mount(newVNode,container)
+}
+```
 
+**二、节点类型没变，需要处理属性data和children子元素。由于节点类型又包括HTML类型和TEXT文本类型，因此都需要单独做处理。**
+
+```javascript
+function patch(oldVNode,newVNode,container){
+   const oldVNodeType = oldVNode.vNodeType;
+   const newVNodeType = newVNode.vNodeType;
+   if(oldVNodeType !== newVNodeType){
+       replaceVNode(oldVNode, newVNode,container);
+   } else{
+       // 标签相同情况下的处理
+       if(newVNodeType === vNodeTypes.HTML){
+           // 标签为HTML的情况下的处理
+           patchElement(oldVNode, newVNode, container)
+       }else if(newVNodeType === vNodeTypes.TEXT){
+           // 标签为TEXT的情况下的处理
+           patchText(oldVNode,newVNode,container)
+       }
+   }
+}
+```
+
+如上所示，我们整个patch函数的处理逻辑就是vNodeType节点类型不同就直接替换。如果节点类型相同，就根据节点分别做处理。这里处于简单考虑，为了避免变得复杂，我们只是简单处理节点类型为HTML和TEXT的节点，不处理节点为COMPONENT和CLASS_COMPONENT类型的节点。因此，我们接下来就是去实现`patchText`和`patchElement`函数。<br>
+
+#### 4.2.3 TEXT类型的虚拟DOM的比较
+
+**patchText方法的实现**<br/>
+
+**文本类型的标签生成的虚拟DOM是如下形式：**
+
+```javascript
+{
+  "tag": null,
+  "vNodeType": "TEXT",
+  "data": {},
+  "children": "文本1",
+  "childType": "SINGLE"
+}
+```
+
+也就是说它的tag为空，data为空，只有children是有值的。因此我们只需要比较children的变化，如果children发生变化了，则替换内容即可。其实现方式如下：
+
+```javascript
+function patchText(oldVNode,newVNode,container){
+    if(newVNode.children !== oldVNode.children){
+        // 注意这里newVNode.el实际上是不存在的，由于节点相同，因此可以直接使用原来的节点
+        oldVNode.el.nodeValue = newVNode.children;
+    }
+}
+```
+
+最关键的是patchElement方法的实现。
+
+#### 4.2.4 HTML类型的虚拟DOM的比较
+
+**patchElement方法的实现**<br>
+
+HTML类型的标签生成的虚拟DOM是如下形式：
+
+```javascript
+{
+  "tag": "div",
+  "vNodeType": "HTML",
+  "data": {
+    "id": "test"
+  },
+  "children": [
+    {
+      "tag": "div",
+      "vNodeType": "HTML",
+      "data": {
+        "key": "a"
+      },
+      "children": "节点2",
+      "childType": "SINGLE"
+    }
+  ],
+  "childType": "MULTIPLE"
+}
+```
+
+我们可以看到HTML类型的虚拟DOM，他的tag，data和children都是有值的，也就是说我们需要分别对其进行比较。其中规则如下：
+
+1. 元素不同，直接替换
+2. 元素相同，更新data和children
+
+![](C:\Users\yinhaiying\Desktop\虚拟DOM\achievement\images\6-patchElement的实现逻辑.jpg)
+
+其大致实现如下所示：
+
+```javascript
+function patchElement(oldVNode, newVNode, container) {
+  const { tag: oldVNodeTag, data: oldData, el } = oldVNode;
+  const { tag: newVNodeTag, data: newData } = newVNode;
+  // 如果标签不同，直接天魂
+  if (oldVNodeTag !== newVNodeTag) {
+    replaceVNode(oldVNode, newVNode, container);
+  } else {
+    // 如果元素相同，则处理data
+    processData(oldData, newData, el);
+    // 如果元素相同，则处理children
+    patchChildren();   // 待实现
+  }
+}
+```
+
+其中`processData`是用来处理data属性。代码如下：
+
+```javascript
+function processData(oldData, newData, el) {
+  // 更新
+  if (newData) {
+    for (let key in newData) {
+      let oldValue = oldData[key];
+      let newValue = newData[key];
+      patchData(el, key, oldValue, newValue);
+    }
+  }
+  // 删除一些不存在的属性
+  if (oldData) {
+    for (let key in oldData) {
+      let oldValue = oldData[key];
+      if (oldValue && !newData.hasOwnProperty(key)) {
+        el && patchData(el, key, oldValue, null);
+      }
+    }
+  }
+}
+```
+
+因此，到目前为止其实我们只剩下一个children没有进行比较。而children的比较也是DOM-Diff的核心。对DOM-Diff的优化都集中在这里。因此我们单独做一节进行讲解。
+
+#### 4.2.5 实现patchChildren方法
+
+我们都知道childType存在EMPTY，SINGLE，MULTIPLE三种类型，分别对应于没有子节点，子节点为文本和子节点有多个。因此对于不同情况进行对比，需要进行不同的处理。
+
+![](C:\Users\yinhaiying\Desktop\虚拟DOM\achievement\images\7-patchChildren.jpg)
+
+对应的代码实现大致框架应该如下所示：
+
+```javascript
+function patchChildren(
+  oldChildren,
+  oldChildType,
+  newChildren,
+  newChildType,
+  container
+) {
+  console.log(
+    "patchChildren:",
+    oldChildren,
+    oldChildType,
+    newChildren,
+    newChildType,
+    container
+  );
+  switch (oldChildType) {
+    case childTypes.EMPTY:
+      switch (newChildType) {
+        case childTypes.EMPTY:
+          break;
+        case childTypes.SINGLE:
+            mountText(newChildren,container)
+          break;
+        case childTypes.MULTIPLE:
+            for(let i = 0;i < newChildren.length;i++){
+                mount(newChildren[i],container);
+            }
+          break;
+      }
+
+      break;
+    case childTypes.SINGLE:
+      switch (newChildType) {
+        case childTypes.EMPTY:
+            container.removeChild(oldChildren.el);
+          break;
+        case childTypes.SINGLE:
+            patchText(oldChildren,newChildren,container)
+          break;
+        case childTypes.MULTIPLE:
+            container.removeChild(oldChildren.el);
+            for (let i = 0; i < newChildren.length; i++) {
+                mount(newChildren[i], container);
+            }
+          break;
+      }
+      break;
+    case childTypes.MULTIPLE:
+      switch (newChildType) {
+        case childTypes.EMPTY:
+            for (let i = 0; i < oldChildren.length; i++) {
+                container.removeChild(oldChildren[i].el);
+            }
+          break;
+        case childTypes.SINGLE:
+            for (let i = 0; i < oldChildren.length; i++) {
+                container.removeChild(oldChildren[i].el);
+            }
+            mountText(newChildren, container)
+          break;
+        case childTypes.MULTIPLE:
+          // TODO:最核心的逻辑在这里
+          break;
+      }
+      break;
+    default:
+      break;
+  }
+}
+```
+
+照着思维导图，我们实现了除了新旧节点都有多个子元素的情况。**其主要思路就是：如果有就更新或者替换，如果没有就删除。**但是对于最后一种情况，不仅仅涉及到添加、删除，还涉及到位置的移动，为了尽可能地提高Diff的算法效率，我们不能暴力地直接删除原来的，然后创建新的。而是需要通过设置特定的key值，通过key值找到前后两个节点，然后进行比较，同时考虑位置的移动。
 
 
 
