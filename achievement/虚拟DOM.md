@@ -831,3 +831,59 @@ function updateChildren(oldChildren,newChildren,container){
 ```
 
 好了，到目前为止我们就完整地实现了`patchChildren`方法，通过添加key标识，考虑没有移动位置，考虑移动位置，一步一步地实现了DOM-Diff的核心功能。虽然我们实现的方法可能不是高效的，但是是尽可能地能够让大家理解的。
+
+## 五、虚拟DOM的使用优化
+
+### 5.1 虚拟DOM的缺点——必须依赖于createElement
+
+到目前为止，我们已经能够实现虚拟DOM的创建，虚拟DOM的渲染以及虚拟DOM的Diff，也就说我们已经能够完整地使用虚拟DOM在项目中进行开发了。但是我们有没有发现，如果我要使用虚拟DOM，我们必须去写createElement函数。比如，下面的DOM结构：
+
+```html
+    <div id="test">
+        <p class = "item">p1</p>
+        <span id = "span1">span1</span>
+    </div>
+```
+
+如果我们使用虚拟DOM来写，那么应该是这样的:
+
+```javascript
+const vNode = createElement("div",{id:"test"},[
+    createElement("p",{key:"a",class:"item"},"p1"),
+    createElement("span",{key:"d",{id:"span1"}},"span1"),
+]);
+```
+
+这还只是简单的两层结构，如果DOM树比较深，那么需要不断地嵌套下去。这样的话写起来就麻烦了。没有人会去写这种代码的。难道我们就因为这个就放弃使用虚拟DOM了吗？肯定不是，事实上React和vue都提供了使用虚拟DOM的优化。其中React就使用了JSX语法来优化虚拟DOM的使用。对于上面的一个虚拟DOM，我们使用JSX写法就是得到这样：
+
+```javascript
+createElement("div",{id:"test"},[
+    createElement("p",{key:"a",class:"item"},"p1"),
+    createElement("span",{key:"d",{id:"span1"}},"span1"),
+]);
+// jsx写法
+<div id = "test">
+    <p className = "item">p1</p>
+    <span id = "span1"><span/>
+</div> 
+```
+
+我们可以发现，我们的createElement被写成了<></>，tag作为标签元素放入尖括号中，而data中的属性则作为元素属性通过a=xxx的形式写入，children作为子元素写入，当然React还单独做了一些特殊处理，比如class变成className，以及需要使用react语法时要使用{}。最终我们可以发现，我们写虚拟DOM实际上就像在写真实DOM一样。这样的话既可以利用虚拟DOM的优点又可以摆脱虚拟DOM有赖于createElement函数的缺点，一举两得。同理，在Vue中我们通过template中写入的标签，实际上也是在写虚拟DOM，背后都是Vue在帮助我们简化处理。
+
+## 六、总结
+
+好了，到目前为止我们已经完成了以下内容：
+
+1. 什么是虚拟DOM？
+2. 为什么虚拟需要DOM？虚拟DOM优点？
+3. 如何创建虚拟DOM？
+4. 如何渲染虚拟DOM？
+5. 虚拟DOM的Diff实现
+6. 虚拟DOM的使用优化
+
+通过一步一步由浅及深地从介绍到实现，从为什么这么做，到如何做，一步一步地完成了虚拟DOM的理解和实现，通过本文你基本上就能够掌握虚拟DOM的大部分知识，更加深入地比如DOM-diff的优化，带着本文掌握的知识，你再去看Vue和React中虚拟DOM的实现，就会轻松许多。好了，还是那句话，想要掌握一个东西，最好的办法就是去简单地实现它。<br>
+
+写在最后，本文中的一下代码，可能在编写过程中存在删减，修改。因此如果想要完整的代码，可以从[github](https://github.com/yinhaiying/vNode/tree/master/achievement)仓库中进行获取。欢迎大家star，我会陆陆续续地通过一些简单的方法去写一些常见的原理或者知识点，帮助大家更好地掌握。<br>
+
+完结撒花。
+
