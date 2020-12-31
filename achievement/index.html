@@ -30,11 +30,16 @@
         // 全部是HTML类型时的处理
         
         var vNode1 = createElement("div",{id:"test"},[
-            createElement("div",{key:"a"},"节点2"),
-            createElement("p",{key:"d"},"节点3"),
-            createElement("p",{key:"b",class:"item"},"节点4"),
+            createElement("div",{key:"1",id:"div1"},"节点1"),
+            createElement("div",{key:"a",id:"div2"},"节点2"),
+            createElement("p",{key:"b",id:"p3"},"节点3"),
+            createElement("p",{key:"c",class:"item"},"节点4"),
         ]);
-        var vNode2 = createElement("div",{id:"test",class:"item",style:{color:"red",background:"green"}},"新的节点");
+        var vNode2 = createElement("div",{id:"test",class:"item"},[
+            createElement("p",{key:"c",class:"item"},"节点4"),
+            createElement("p",{key:"b",style:{color:"red"}},"节点3"),
+            createElement("div",{key:"a",class:"class1"},"节点2"),
+        ]);
 
 
         var oApp = document.getElementById("app");

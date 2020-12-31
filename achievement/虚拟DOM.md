@@ -715,6 +715,7 @@ function patchChildren(
           break;
         case childTypes.MULTIPLE:
           // TODO:最核心的逻辑在这里
+          updateChiidren(oldChildren,newChildren,container)
           break;
       }
       break;
@@ -724,12 +725,109 @@ function patchChildren(
 }
 ```
 
-照着思维导图，我们实现了除了新旧节点都有多个子元素的情况。**其主要思路就是：如果有就更新或者替换，如果没有就删除。**但是对于最后一种情况，不仅仅涉及到添加、删除，还涉及到位置的移动，为了尽可能地提高Diff的算法效率，我们不能暴力地直接删除原来的，然后创建新的。而是需要通过设置特定的key值，通过key值找到前后两个节点，然后进行比较，同时考虑位置的移动。
+照着思维导图，我们实现了除了新旧节点都有多个子元素的情况。**其主要思路就是：如果有就更新或者替换，如果没有就删除。**但是对于最后一种情况，不仅仅涉及到添加、删除，还涉及到位置的移动，因此逻辑较为复杂。也是DOM-Diff的各种优化的地方。<br>
+
+**1、给每个虚拟DOM添加唯一的标识key**
+
+事实上最后一种情况就是两个数组的比较，我们需要找到数组中每个元素的变化。示例：
+
+![](C:\Users\yinhaiying\Desktop\虚拟DOM\achievement\images\8-多个children的比较.jpg)
+
+我们使用createElement创建的虚拟DOM中children的个数为3个，新的虚拟DOM也有3个虚拟DOM。也就是说我们需要比较长度为3的两个数组。我们在之前的DOM-Diff规则中说过，我们的虚拟DOM的比较必须是描述同一个DOM节点之间进行比较。因此我们要找出数组中前后描述同一个节点的两个元素进行比较但是由于虚拟DOM是通过createElement创建的，得到的虚拟DOM也都是由tag，data，children组成，因此我们很难区分哪个虚拟DOM是描述哪一个节点。因此也就无从比较。只能全都删除原来的旧的节点，然后根据新的虚拟DOM创建新的节点。这毫无疑问是非常低效的。**因此，我们第一件事就是需要加上一个标识用来标记这个虚拟DOM是描述哪个节点，这样的话通过这个标识就能够在更改前后进行区分了。**这也是为什么Vue和React在遍历时要求添加唯一的标识的原因。
+
+![](C:\Users\yinhaiying\Desktop\虚拟DOM\achievement\images\9-给每个虚拟DOM添加唯一的标识Key.jpg)
 
 
 
+**2、不考虑位置移动，只考虑节点的更新，以及增加和删除**
 
+```javascript
+function updateChildren(oldChildren,newChildren,container){
+    console.log("updateChildren", oldChildren,newChildren);
+    for(let i = 0;i < newChildren.length;i++){
+      let newVNode = newChildren[i];
+      let isFind = false;
+      for(let j = 0;j < oldChildren.length;j++){
+        let oldVNode = oldChildren[j];
+        if(newVNode.data.key === oldVNode.data.key){
+          // key值相等才进行比较
+          patch(oldVNode,newVNode,container);
+          isFind = true;  // 表示前后都存在这个元素，说明不是新增的元素
+        }
+      }
+      // 没有找到说明是新增的元素，因此需要插入到指定位置
+      if(!isFind){
+          let flagNode = i === 0 ? oldChildren.el : newChildren[i - 1].el.nextSibling;
+          // 表示是需要新增的元素
+          mount(nextVNode, container, flagNode)
+      }
+    }
+    // 删除不需要的元素
+    for (let i = 0; i < oldChildren.length; i++) {
+      console.log("删除不需要的元素:")
+      const preVNode = oldChildren[i];
+      const has = newChildren.find(next => next.data.key === preVNode.data.key);
+      if (!has) {
+        container.removeChild(preVNode.el);
+      }
+    }
+}
+```
 
+如果我们不考虑节点位置的移动，只是考虑节点的更新包括新增，删除和属性等的更新。那么实现思路比较简单，只需要通过遍历前后节点，对key值相等的进行比较。遍历存在以下几种情况：
 
+- key值在新旧节点中都存在，说明只需要进行diff更新即可。
+- key值在新节点中存在，在旧节点中不存在。说明是新增的，注意新增的节点需要插入到指定位置。
+- key值在旧节点中存在，在新节点中不存在，说明需要删除这个节点。
 
+这里特别需要注意的是对于新增的元素，不一定是直接在挂载容器的尾部插入，他可能是在指定位置进行插入，因此需要使用`insertBefore`，也就是说我们需要找到参考的节点，在这个参考节点后面插入，因此我们在`mount`方法中新增了一个`flagNode`参数（注意：mount中新增了flagNode参数，同时mountElement也进行了修改）。
 
+**3、考虑节点的位置移动**<br>
+
+我们都知道虚拟DOM是用来描述真实DOM的，因此虚拟DOM位置的改变(也就是在数组中位置的改变)，直接影响到在DOM树上的位置，从而影响整个页面，因此我们不能简单地只更新属性，children等，还需要考虑位置的改变。这也是虚拟DOM优化的一个重点，各种各样的算法优化核心基本上都在这里。但是，这里我们只是为了简单地了解虚拟DOM的Diff过程，不会去写很高深的算法，那样的话反而容易把人陷入算法中，与本文的主旨不符，因此我们这里的算法可能是比较低效的，但是是为了方便理解的。**我们都知道考虑节点的位置移动，最核心的一点就是知道节点发生移动的判断标准是什么？**。**这里我们判断的标准就是两个相邻的元素的顺序是否发生了变化。如果原来是递增的，现在还是递增的，那么就不需要发生移动，如果原来是递增的，现在变成递减了，那么就需要发生移动。**<br>
+
+比如：[“节点1”，“节点4”，“节点2”]中节点1和节点4原来的顺序是0,1递增的。<br>
+
+但是新的vNode变成了[“节点4”，“节点1”，“节点2”]，节点1和节点4的顺序是1,0递减的，说明节点1需要移动位置。他需要插入到节点4的后面。也就是说我们需要一个变量来记录一下前一个元素在旧节点中的位置，然后遍历时又能够获取到它在旧节点中的位置。这样的话，在新节点中他们是递增的(遍历时从1到n，是递增的)，但是如果记录的旧节点是递减的，说明位置发生了移动需要进行位置变化。位置变化的实现就是插入到新的位置。最终的实现如下：
+
+```javascript
+function updateChildren(oldChildren,newChildren,container){
+    let lastIndex = 0;  // 上一个元素在就数组中的位置
+    for(let i = 0;i < newChildren.length;i++){
+      let newVNode = newChildren[i];
+      let isFind = false;
+      for(let j = 0;j < oldChildren.length;j++){
+        let oldVNode = oldChildren[j];
+        if(newVNode.data.key === oldVNode.data.key){
+          patch(oldVNode,newVNode,container);
+          isFind = true;  // 表示前后都存在这个元素，说明不是新增的元素
+          // 当前元素在旧节点中是在它前面的，现在在它后面了。说明相对位置发生了变化
+          if (j < lastIndex) {
+            let flagNode = newChildren[i - 1].el.nextSibling;   // 找到要插入位置的下一个元素
+            container.insertBefore(preVNode.el, flagNode);
+          } else {
+            // 记录在旧节点中的位置
+            lastIndex = j;
+          }
+        }
+      }
+      // 没有找到说明是新增的元素，因此需要插入到指定位置
+      if(!isFind){
+          let flagNode = i === 0 ? oldChildren.el : newChildren[i - 1].el.nextSibling;
+          // 表示是需要新增的元素
+          mount(nextVNode, container, flagNode)
+      }
+    }
+    // 删除不需要的元素
+    for (let i = 0; i < oldChildren.length; i++) {
+      console.log("删除不需要的元素:")
+      const preVNode = oldChildren[i];
+      const has = newChildren.find(next => next.data.key === preVNode.data.key);
+      if (!has) {
+        container.removeChild(preVNode.el);
+      }
+    }
+}
+```
+
+好了，到目前为止我们就完整地实现了`patchChildren`方法，通过添加key标识，考虑没有移动位置，考虑移动位置，一步一步地实现了DOM-Diff的核心功能。虽然我们实现的方法可能不是高效的，但是是尽可能地能够让大家理解的。

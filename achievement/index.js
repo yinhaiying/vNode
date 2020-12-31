@@ -41,6 +41,7 @@ function createElement(tag, data, children) {
     data,
     children,
     childType,
+    el:null
   };
 }
 
@@ -64,21 +65,20 @@ function render(vNode, container) {
   // 每次渲染完成之后都把vNode挂载到container身上
   container.vNode = vNode;
 }
-function mount(vNode, container) {
+function mount(vNode, container,flagNode) {
   const { vNodeType } = vNode;
   // 不同的节点，有不同的挂载方式。文本节点单独处理
   if (vNodeType == vNodeTypes.HTML) {
-    mountElement(vNode, container);
+    mountElement(vNode, container, flagNode);
   } else if (vNodeType === vNodeTypes.TEXT) {
     mountText(vNode, container);
   }
 }
 
-function mountElement(vNode, container) {
+function mountElement(vNode, container, flagNode) {
   const { tag, childType, children, data } = vNode;
   const dom = document.createElement(tag);
   vNode.el = dom;
-
   // 处理data
   if (data) {
     for (let key in data) {
@@ -95,7 +95,11 @@ function mountElement(vNode, container) {
       mount(child, dom);
     }
   }
-  container.appendChild(dom);
+  if (flagNode) {
+    container.insertBefore(dom, flagNode);
+  } else {
+    container.appendChild(dom);
+  }
 }
 
 function mountText(vNode, container) {
@@ -138,9 +142,11 @@ function patch(oldVNode, newVNode, container) {
     // 标签相同情况下的处理
     if (newVNodeType === vNodeTypes.HTML) {
       // 标签为HTML的情况下的处理
+      console.log("标签情况下的比较")
       patchElement(oldVNode, newVNode, container);
     } else if (newVNodeType === vNodeTypes.TEXT) {
       // 标签为TEXT的情况下的处理
+      console.log("TEXT情况下的比较")
       patchText(oldVNode, newVNode, container);
     }
   }
@@ -169,6 +175,7 @@ function patchElement(oldVNode, newVNode, container) {
   if (oldVNodeTag !== newVNodeTag) {
     replaceVNode(oldVNode, newVNode, container);
   } else {
+    newVNode.el = el;
     // 如果元素相同，则处理data
     processData(oldData, newData, el);
     // 如果元素相同，则处理children
@@ -191,14 +198,6 @@ function patchChildren(
   newChildType,
   container
 ) {
-  console.log(
-    "patchChildren:",
-    oldChildren,
-    oldChildType,
-    newChildren,
-    newChildType,
-    container
-  );
   switch (oldChildType) {
     case childTypes.EMPTY:
       switch (newChildType) {
@@ -245,6 +244,7 @@ function patchChildren(
             mountText(newChildren, container)
           break;
         case childTypes.MULTIPLE:
+          updateChildren(oldChildren,newChildren,container)
           break;
       }
       break;
@@ -252,6 +252,51 @@ function patchChildren(
       break;
   }
 }
+
+function updateChildren(oldChildren,newChildren,container){
+    console.log("updateChildren", oldChildren,newChildren);
+    let lastIndex = 0;
+    for(let i = 0;i < newChildren.length;i++){
+      let newVNode = newChildren[i];
+      console.log("newVNode",newVNode)
+      let isFind = false;
+      for(let j = 0;j < oldChildren.length;j++){
+        let oldVNode = oldChildren[j];
+        if(newVNode.data.key === oldVNode.data.key){
+          // key值相等才进行比较
+          patch(oldVNode,newVNode,container);
+          isFind = true;  // 表示前后都存在这个元素，说明不是新增的元素
+          // 当前元素在旧节点中是在它前面的，现在在它后面了。
+          if (j < lastIndex) {
+            // 需要移动元素 insertBefore移动元素
+            // abc a 移动到b之后。那么需要找到新的位置的前一个,insertBefore(b的下一个元素)
+            // 找到新的位置的前一个，然后进行插入
+            let flagNode = newChildren[i - 1].el.nextSibling; // 找到要插入位置的下一个元素
+            container.insertBefore(oldVNode.el, flagNode);
+          } else {
+            // 记录在旧节点中的位置
+            lastIndex = j;
+          }
+        }
+      }
+      // 没有找到说明是新增的元素，因此需要插入到指定位置
+      if(!isFind){
+          let flagNode = i === 0 ? oldChildren.el : newChildren[i - 1].el.nextSibling;
+          // 表示是需要新增的元素
+          mount(nextVNode, container, flagNode)
+      }
+    }
+    // 删除不需要的元素
+    for (let i = 0; i < oldChildren.length; i++) {
+      console.log("删除不需要的元素:")
+      const preVNode = oldChildren[i];
+      const has = newChildren.find(next => next.data.key === preVNode.data.key);
+      if (!has) {
+        container.removeChild(preVNode.el);
+      }
+    }
+}
+
 
 function processData(oldData, newData, el) {
   // 更新

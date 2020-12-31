@@ -227,15 +227,15 @@ function patchChildren(
                                 // key相同，表示是同一个元素
                                 patch(preVNode, nextVNode, container);
                                 // 只要新数组中，元素相对于前一个兄弟元素的位置，仍然是递增的，那么就不需要处理。
-                                // if (j < lastIndex) {
-                                //     // 需要移动元素 insertBefore移动元素
-                                //     // abc a 移动到b之后。那么需要c的位置，然后使用父元素.insertBefore(a,c)
-                                //     // 只能通过insertBefore进行移动。
-                                //     let flagNode = nextChildren[i - 1].el.nextSibling;
-                                //     container.insertBefore(preVNode.el, flagNode);
-                                // } else {
-                                //     lastIndex = j;
-                                // }
+                                if (j < lastIndex) {
+                                    // 需要移动元素 insertBefore移动元素
+                                    // abc a 移动到b之后。那么需要c的位置，然后使用父元素.insertBefore(a,c)
+                                    // 只能通过insertBefore进行移动。
+                                    let flagNode = nextChildren[i - 1].el.nextSibling;
+                                    container.insertBefore(preVNode.el, flagNode);
+                                } else {
+                                    lastIndex = j;
+                                }
                             }
                         }
                         if (!isFind) {
